@@ -43,7 +43,61 @@ lead_univ = lead_univ.replace('-', np.nan)
 #clean leadscore column
 lead_univ['[Lead Score]'] = lead_univ['[Lead Score]'].str.replace('%', '')
 lead_univ['[Lead Score]'] = lead_univ['[Lead Score]'].astype('float')
-#lead_univ['Opportunity ID'] = lead_univ['Opportunity ID'].replace('-', np.nan)
+
+#replace old BU names with new names
+business_units = ['MR', 'PDO', 'HPM', 'US', 'EC', 'Others', 'CVI', 'CI', 'DXR', 'IGT(Fix+MoS)', 'CT', 'IGTD', 'RI', 'EMR&CM', 'AMD', 'CII']
+# Dictionary with replacements
+replacements = {
+    'MR OEM': 'MR',
+    'Precision Diagnosis Other': 'PDO',
+    'Hospital Patient Monitoring': 'HPM',
+    'Ultrasound': 'US',
+    'Emergency Care': 'EC',
+    'Health Tech other': 'Others',
+    'Cardiovascular Informatics': 'CVI',
+    'Clinical Informatics': 'CI',
+    'Monitoring Others': 'Others',
+    'DXR': 'DXR',
+    'Image Guided Therapy Systems': 'IGT(Fix+MoS)',
+    'CT AMI': 'CT',
+    'Image Guided Therapy Devices': 'IGTD',
+    'Radiology Informatics': 'RI',
+    'EMR & Care Mgt': 'EMR&CM',
+    'Image Guided Therapy Others': 'IGT(Fix+MoS)',
+    'Innovation & Services': 'Others',
+    '8277': 'Others',
+    'Ambulatory Monitoring & Diagnostics': 'AMD',
+    'Clinical Integration & Insights': 'CII',
+    'EPD Solutions': 'Others'
+}
+# Replace values using the dictionary
+lead_univ['Business Unit'] = lead_univ['Business Unit'].replace(replacements)
+lead_data_opp['Business Unit'] = lead_data_opp['Business Unit'].replace(replacements)
+
+#replace old stage names with new names
+# Dictionary with replacements
+replacements_stage = {
+    'Opportunity Stage': 'CAT',
+    'Sales Recognized': 'WON',
+    'Order Booked': 'WON',
+    '-': 'L/NP',
+    'Cancelled by Customer': 'L/NP',
+    'Develop': 'ACTIVE',
+    'Identify': 'ACTIVE',
+    'Qualify': 'ACTIVE',
+    'Lost': 'ACTIVE',
+    'Not Pursuing': 'L/NP',
+    'Propose': 'ACTIVE',
+    'Develop': 'ACTIVE',
+    'Order Promised': 'WON',
+    'Pre-Qualification (Master)': 'ACTIVE',
+    'Qualify (Master)': 'ACTIVE',
+    'Pre Qualified': 'L/NP',
+    'Customer Cancelled': 'L/NP'
+}
+# Replace values using the dictionary
+lead_univ['Opportunity Stage'] = lead_univ['Opportunity Stage'].replace(replacements_stage)
+lead_data_opp['Opportunity Stage'] = lead_data_opp['Opportunity Stage'].replace(replacements)
 
 # Initialize session state for the filters
 if 'start_date' not in st.session_state:
@@ -68,6 +122,13 @@ zone_filter = st.sidebar.multiselect(
     default=lead_univ['Zone'].unique()
 )
 
+# Create sidebar multi-select filter for 'Business Unit'
+bu_filter = st.sidebar.multiselect(
+    'Select BU', 
+    options=business_units, 
+    default=business_units
+)
+
 # Add Clear All button
 if st.sidebar.button('Clear All'):
     st.session_state.start_date = lead_univ['Lead Creation Date'].min()
@@ -77,19 +138,21 @@ if st.sidebar.button('Clear All'):
 # Filter data by date range
 filtered_data = lead_univ[(lead_univ['Lead Creation Date'] >= start_date) & (lead_univ['Lead Creation Date'] <= end_date)]
 filtered_data = filtered_data[filtered_data['Zone'].isin(zone_filter)]
+filtered_data = filtered_data[filtered_data['Business Unit'].isin(bu_filter)]
 
 filtered_opp = lead_data_opp[(lead_data_opp['Lead Creation Date'] >= start_date) & (lead_data_opp['Lead Creation Date'] <= end_date)]
 filtered_opp = filtered_opp[filtered_opp['Zone'].isin(zone_filter)]
+filtered_opp = filtered_opp[filtered_opp['Business Unit'].isin(bu_filter)]
 
+
+#%% Subheader for Q1
+st.subheader('1. Which zones generate the most leads?', divider='rainbow')
 # Group by Zone and count leads
 zone_lead_counts = filtered_data['Zone'].value_counts().reset_index()
 zone_lead_counts.columns = ['Zone', 'Lead Count']
 
 # Sort by lead count in descending order
 zone_lead_counts = zone_lead_counts.sort_values(by='Lead Count', ascending=False)
-
-#%% Subheader for Q1
-st.subheader('1. Which zones generate the most leads?', divider='rainbow')
 # Create the bar chart using plotly
 fig = px.bar(zone_lead_counts, 
              x='Zone', 
@@ -452,7 +515,7 @@ st.write('Positive residuals indicate a higher observed count than expected, whi
 
 
 #%%# Subheader for Q8
-st.subheader('8. What are the Main Reasons for Lead Rejection?')
+st.subheader('8. What are the Main Reasons for Lead Rejection?', divider='rainbow')
 
 # Group by 'Reason for Rejection' and count occurrences
 reason_rejection_data = filtered_data['Reason for Rejection'].value_counts().reset_index()
@@ -481,7 +544,7 @@ fig_rejection_reasons.update_layout(
 st.plotly_chart(fig_rejection_reasons)
 
 #%% Subheader for Q9
-st.subheader('9. How effective are different lead actions in converting leads to opportunities?')
+st.subheader('9. How effective are different lead actions in converting leads to opportunities?', divider='rainbow')
 # 1. Group by 'Lead Action' and 'Opportunity Stage' to get counts
 lead_action_vs_stage = filtered_data.groupby(['Lead Action', 'Opportunity Stage']).size().reset_index(name='Count')
 
@@ -553,7 +616,7 @@ st.dataframe(significant_residuals)
 st.write('Positive residuals indicate a higher observed count than expected, while negative residuals indicate a lower observed count than expected.')
 
 #%% Subheader for Q10
-st.subheader('10. What are the popular products of interest among leads?')
+st.subheader('10. What are the popular products of interest among leads?', divider='rainbow')
 
 # Count occurrences of each product
 product_counts = filtered_data['Product of Interest'].value_counts().reset_index()
@@ -563,7 +626,6 @@ product_counts.columns = ['Product of Interest', 'Lead Count']
 product_counts = product_counts.sort_values(by='Lead Count', ascending=False)
 
 # Plot the most popular products using a bar chart
-st.subheader('Popular Products of Interest Among Leads', divider='rainbow')
 fig_product_interest = px.bar(product_counts, 
                               x='Product of Interest', 
                               y='Lead Count', 
@@ -585,7 +647,7 @@ st.plotly_chart(fig_product_interest)
 st.write("Product Interest Data", product_counts)
 
 #%%12. Which lead sources have the highest conversion rates?
-st.subheader('12. Which lead sources have the highest conversion rates?')
+st.subheader('12. Which lead sources have the highest conversion rates?', divider='rainbow')
 
 # Step 1: Group by 'Lead Source Original' and calculate conversion rates
 conversion_data = filtered_data.groupby('Lead Source Original').agg(
@@ -631,7 +693,7 @@ fig_source_conv.update_layout(
 st.plotly_chart(fig_source_conv)
 
 #%%What is the average lead scoring for each lead source?
-st.subheader('13. What is the average lead scoring for each lead source?')
+st.subheader('13. What is the average lead scoring for each lead source?', divider='rainbow')
 
 # Step 1: Group by 'Lead Source Original' and calculate the average lead score
 avg_lead_score_data = filtered_data.groupby('Lead Source Original')['[Lead Score]'].mean().reset_index()
@@ -661,7 +723,7 @@ fig_lead_score.update_layout(
 st.plotly_chart(fig_lead_score)
 
 #%%Which users are generating the most leads?
-st.subheader('14. Which users are generating the most leads?')
+st.subheader('14. Which users are generating the most leads?', divider='rainbow')
 
 # Step 1: Group by 'Username' and count the number of leads for each user
 user_lead_data = filtered_data.groupby('Username').size().reset_index(name='Lead Count')
@@ -692,7 +754,7 @@ fig_user.update_layout(
 st.plotly_chart(fig_user)
 
 #%%What is the distribution of leads by business category?
-st.subheader('15. What is the distribution of leads by business category?')
+st.subheader('15. What is the distribution of leads by business category?', divider='rainbow')
 
 # Step 1: Group by 'Business' and 'Business Category' and count the number of leads in each category
 business_category_data = filtered_data.groupby(['Business', 'Business Category']).size().reset_index(name='Lead Count')
@@ -735,7 +797,7 @@ fig_cat.update_layout(
 st.plotly_chart(fig_cat)
 
 #%%What are the monthly trends in lead creation?
-st.subheader('18. What are the monthly trends in lead creation?')
+st.subheader('18. What are the monthly trends in lead creation?', divider='rainbow')
 # Step 1: Ensure 'Lead Creation Date' is in datetime format
 filtered_data['Lead Creation Date'] = pd.to_datetime(filtered_data['Lead Creation Date'])
 
@@ -769,7 +831,7 @@ fig_trend.update_layout(
 st.plotly_chart(fig_trend)
 
 #%%What are the monthly trends in lead creation?
-st.subheader('19. What is the average order amount associated with converted leads?')
+st.subheader('19. What is the average order amount associated with converted leads?', divider='rainbow')
 
 # Step 2: Group by 'Business' and calculate total leads and total order amount
 business_summary = filtered_data.groupby('Business').agg(
@@ -834,7 +896,7 @@ st.plotly_chart(fig_order)
 #plotly.offline.plot(fig_order)
 
 #%%What are the monthly trends in lead creation?
-st.subheader('20. How many leads are generated per campaign channel?')
+st.subheader('20. How many leads are generated per campaign channel?', divider='rainbow')
 
 # Step 1: Group by 'Campaign - Channel' and count the number of leads
 channel_leads = filtered_data.groupby('[Campaign - Channel]').agg(
@@ -867,7 +929,7 @@ fig_cc.update_layout(
 st.plotly_chart(fig_cc)
 
 #%%Which clusters report the highest lead generation?
-st.subheader('21. Which clusters report the highest lead generation?')
+st.subheader('21. Which clusters report the highest lead generation?', divider='rainbow')
 
 # Step 1: Group by 'Campaign - Channel' and count the number of leads
 cluster_leads = filtered_data.groupby('Reporting Cluster').agg(
@@ -900,7 +962,7 @@ fig_cl.update_layout(
 st.plotly_chart(fig_cl)
 
 #%%How does lead quality vary by zone?
-st.subheader('22. How does lead quality vary by zone?')
+st.subheader('22. How does lead quality vary by zone?', divider='rainbow')
 
 # Step 1: Group by 'Zone' and 'Lead Qualification Level' and count the number of leads for each combination
 zone_qualification = filtered_data.groupby(['Zone', 'Lead Qualification Level']).size().reset_index(name='Lead Count')
@@ -936,7 +998,7 @@ fig_zone.update_layout(
 st.plotly_chart(fig_zone)
 
 #%%What is the lead-to-opportunity conversion rate for each business unit?
-st.subheader('23. What is the lead-to-opportunity conversion rate for each business unit?')
+st.subheader('23. What is the lead-to-opportunity conversion rate for each business unit?', divider='rainbow')
 
 # Step 1: Filter the dataframe to exclude leads without a valid 'Opportunity ID'
 filtered_data['Opportunity Exists'] = filtered_data['Opportunity ID'].notna()  # Create a column to flag valid Opportunity IDs
@@ -984,7 +1046,7 @@ fig_ratio.update_layout(
 st.plotly_chart(fig_ratio)
 
 #%%How do opportunity stages correlate with lead sources?
-st.subheader('25. How do opportunity stages correlate with lead sources?')
+st.subheader('25. How do opportunity stages correlate with lead sources?', divider='rainbow')
 
 # 1. Group by 'Lead Action' and 'Opportunity Stage' to get counts
 lead_source_vs_stage = filtered_data.groupby(['Lead Source', 'Opportunity Stage']).size().reset_index(name='Count')
@@ -1058,11 +1120,10 @@ st.dataframe(significant_residuals)
 st.write('Positive residuals indicate a higher observed count than expected, while negative residuals indicate a lower observed count than expected.')
 
 #%%Which campaigns contribute the most to closed opportunities?
-st.subheader('26. Which campaigns contribute the most to closed opportunities?')
+st.subheader('26. Which campaigns contribute the most to closed opportunities?', divider='rainbow')
 
-# Step 1: Filter the dataframe for closed opportunities based on 'StageName'
-closed_stages = ['Order Booked', 'Sales Recognized', 'Order Promised']
-closed_opportunities = filtered_data[filtered_data['StageName'].isin(closed_stages)]
+# Step 1: Filter the dataframe for closed opportunities based on 'Opportunity Stage'
+closed_opportunities = filtered_data[~filtered_data['Opportunity Stage'].isin(['ACTIVE'])]
 
 # Step 2: Group by 'Campaign Name' and count the number of closed opportunities for each campaign
 campaign_closed_opportunities = closed_opportunities.groupby('Campaign Name').size().reset_index(name='Closed Opportunity Count')
@@ -1095,7 +1156,7 @@ fig_camp_contrb.update_layout(
 st.plotly_chart(fig_camp_contrb)
 
 #%%What is the time taken from lead creation to order promised date?
-st.subheader('27. What is the time taken from lead creation to order promised date?')
+st.subheader('27. What is the time taken from lead creation to order promised date?', divider='rainbow')
 
 # Step 1: Ensure 'Lead Creation Date' and 'Opportunity Order Promised Date' are in datetime format
 filtered_data['Lead Creation Date'] = pd.to_datetime(filtered_data['Lead Creation Date'])
@@ -1134,13 +1195,10 @@ fig_crt_prom.update_layout(
 st.plotly_chart(fig_crt_prom)
 
 #%%How often do leads in a specific business category convert?
-st.subheader('29. How often do leads in a specific business category convert?')
-
-# Step 1: Define closed stages
-closed_stages = ['Order Booked', 'Sales Recognized', 'Order Promised']
+st.subheader('29. How often do leads in a specific business category convert?', divider='rainbow')
 
 # Step 2: Add a column to flag whether the opportunity is closed
-filtered_data['Converted'] = filtered_data['StageName'].isin(closed_stages)
+filtered_data['Converted'] = ~filtered_data['Opportunity Stage'].isin(['ACTIVE'])
 
 # Step 3: Group by 'Business Category' and calculate total leads and total closed opportunities
 conversion_data = filtered_data.groupby('Business Category').agg(
@@ -1180,11 +1238,10 @@ fig_biz_conv.update_layout(
 st.plotly_chart(fig_biz_conv)
 
 #%%Which user types (e.g., admin, sales) close the most opportunities?
-st.subheader('30. Which user types (e.g., admin, sales) close the most opportunities?')
+st.subheader('30. Which user types (e.g., admin, sales) close the most opportunities?', divider='rainbow')
 
 # Step 1: Filter the dataframe for closed opportunities based on 'StageName'
-closed_stages = ['Order Booked', 'Sales Recognized', 'Order Promised']
-closed_opportunities = filtered_data[filtered_data['StageName'].isin(closed_stages)]
+closed_opportunities = filtered_data[~filtered_data['Opportunity Stage'].isin(['ACTIVE'])]
 
 # Step 2: Group by 'Lead Role' and count the number of closed opportunities for each role
 role_closed_opportunities = closed_opportunities.groupby('Lead Role').size().reset_index(name='Closed Opportunity Count')
@@ -1216,85 +1273,3 @@ fig_role.update_layout(
 
 # Show the plot
 st.plotly_chart(fig_role)
-
-#%% Subheader for Q5
-st.subheader('5. Revisited: Which campaigns result in the highest lead conversion rates?', divider='rainbow')
-
-# Step 1: Group by 'Campaign Name' and calculate total leads and converted leads
-campaign_conversion_data = filtered_data.groupby('Campaign Name').agg(
-    total_leads=('Lead ID', 'count'),
-    converted_leads=('Opportunity ID', lambda x: x.notna().sum())
-).reset_index()
-
-# Step 2: Calculate conversion rate
-campaign_conversion_data['conversion_rate'] = (campaign_conversion_data['converted_leads'] / campaign_conversion_data['total_leads']) * 100
-campaign_conversion_data['conversion_rate'] = round(campaign_conversion_data['conversion_rate'], 1)
-
-# Step 3: Filter rows where conversion rate > 0
-campaign_conversion_data = campaign_conversion_data[campaign_conversion_data['conversion_rate'] > 0]
-
-# Step 4: Sort the data by conversion rate in descending order
-campaign_conversion_data = campaign_conversion_data.sort_values(by='converted_leads', ascending=False)
-
-# Step 5: Calculate cumulative contribution for Pareto principle
-campaign_conversion_data['Cumulative Contribution'] = campaign_conversion_data['conversion_rate'].cumsum() / campaign_conversion_data['conversion_rate'].sum() * 100
-
-# Step 6: Filter for the top 80% contributors (Pareto view)
-pareto_conversion_data = campaign_conversion_data[campaign_conversion_data['Cumulative Contribution'] <= 80]
-
-# Step 7: Group the remaining categories as "Others" for the Pareto view
-remaining_categories_conv = campaign_conversion_data[campaign_conversion_data['Cumulative Contribution'] > 80]
-others_conv = pd.DataFrame({
-    'Campaign Name': ['Others'],
-    'total_leads': [remaining_categories_conv['total_leads'].sum()],
-    'converted_leads': [remaining_categories_conv['converted_leads'].sum()],
-    'conversion_rate': [remaining_categories_conv['conversion_rate'].sum()],
-    'Cumulative Contribution': [100.0]  # Since 'Others' will sum up to 100%
-})
-
-# Step 8: Create a bar chart to visualize the mean time difference across business units
-on_camp = st.toggle("Pareto View", key="on_camp")
-
-if on_camp:
-    fig_pareto_conv = px.bar(
-    pareto_conversion_data, 
-    x='Campaign Name', 
-    y='conversion_rate', 
-    text='conversion_rate',
-    hover_data={'total_leads': True, 'converted_leads': True},  # Show extra info on hover
-    title='Lead Conversion Rates by Campaign (Pareto)',
-    labels={'Campaign Name': 'Campaign Name', 'conversion_rate': 'Conversion Rate (%)'},
-    )
-
-    # Update layout for better display
-    fig_pareto_conv.update_traces(texttemplate='%{text:.0f}%', textposition='inside')
-    fig_pareto_conv.update_layout(
-        xaxis_title='Campaign Name', 
-        yaxis_title='Conversion Rate (%)', 
-        height=900,
-        showlegend=False
-    )
-    st.plotly_chart(fig_pareto_conv)
-else:
-    fig_campaign_conversion = px.bar(
-        campaign_conversion_data, 
-        x='Campaign Name', 
-        y='conversion_rate', 
-        text='converted_leads', 
-        title='Lead Conversion Rates by Campaign',
-        labels={'Campaign Name': 'Campaign Name', 'conversion_rate': 'Conversion Rate (%)'},
-        color='conversion_rate',
-        color_continuous_scale=px.colors.sequential.Viridis
-    )
-    
-    # Update layout for better display
-    fig_campaign_conversion.update_traces(texttemplate='%{text:.2f}', textposition='outside')
-    fig_campaign_conversion.update_layout(
-        xaxis_title='Campaign Name', 
-        yaxis_title='Conversion Rate (%)', 
-        xaxis={'categoryorder':'total descending'},  # Sort the x-axis based on total_leads
-        height=900,
-        showlegend=False
-    )
-
-    st.plotly_chart(fig_campaign_conversion)
