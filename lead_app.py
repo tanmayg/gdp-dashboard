@@ -60,7 +60,7 @@ def format_euro(value):
 # Load your dataframe
 @st.cache_data
 def load_data():
-    with open('./LeadAnalysis/lead_app_data.pkl', 'rb') as file:
+    with open(Path(__file__).parent/'data/lead_app_data.pkl', 'rb') as file:
         loaded_dataframes = pickle.load(file)
     return loaded_dataframes
 
