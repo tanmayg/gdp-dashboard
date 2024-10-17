@@ -273,6 +273,7 @@ filtered_opp = filtered_opp[filtered_opp['[Campaign - Channel]'].isin(chnnl_filt
 #------------------ P   L   O   T   S   ------------------------#
 #---------------------------------------------------------------#
 
+
 #%% Subheader for Q1
 st.subheader('1. Which zones generate the most leads?', divider='rainbow')
 
@@ -332,11 +333,11 @@ fig_bu_mql = create_stacked_bar_ts(
 on_mqls = st.toggle("Show MQLs", key="q1")
 
 if on_mqls:
-    st.plotly_chart(fig_zone_mql)
-    st.plotly_chart(fig_bu_mql)
+    st.plotly_chart(fig_zone_mql, key='1a')
+    st.plotly_chart(fig_bu_mql, key='1b')
 else:
-    st.plotly_chart(fig_zone_lead)
-    st.plotly_chart(fig_bu_lead)
+    st.plotly_chart(fig_zone_lead, key='1c')
+    st.plotly_chart(fig_bu_lead, key='1d')
 
  
    
@@ -384,7 +385,7 @@ fig_src.update_layout(
 )
 
 # Display the chart
-st.plotly_chart(fig_src)
+st.plotly_chart(fig_src, key='2a')
 
 # Group data by Zone and Date to get the lead count over time
 lead_src_counts_ts = filtered_data.groupby(['Year-Month', 'Lead_Source_Catg']).size().reset_index(name='Lead Count')
@@ -399,7 +400,7 @@ fig_src_ts = create_stacked_bar_ts(
     yaxis_title='Number of Leads',
     color_column='Lead_Source_Catg'  # Stacked bars by Zone
 )
-st.plotly_chart(fig_src_ts)
+st.plotly_chart(fig_src_ts, key='2b')
 
 #%% Subheader for Q3
 st.subheader('3. What proportion of leads are getting converted to opportunities?', divider='rainbow')
@@ -464,7 +465,7 @@ fig_conv_zone.update_traces(
 col1, col2 = st.columns([2,1], gap="small")
 with col1:
     # Display the plot in the Streamlit app
-    st.plotly_chart(fig_conv_zone)
+    st.plotly_chart(fig_conv_zone, key='3a')
     #plotly.offline.plot(fig)
 
 with col2:
@@ -535,7 +536,7 @@ fig_conv_bu.update_traces(
 col1, col2 = st.columns([2,1], gap="small")
 with col1:
     # Display the plot in the Streamlit app
-    st.plotly_chart(fig_conv_bu)
+    st.plotly_chart(fig_conv_bu, key='3b')
     #plotly.offline.plot(fig)
 
 with col2:
@@ -632,10 +633,10 @@ fig_conv_plot_2 = create_time_series_comp(
 # Step 4: Display the plots side by side for comparison
 col1, col2 = st.columns(2)
 with col1:
-    st.plotly_chart(fig_conv_plot_1)
+    st.plotly_chart(fig_conv_plot_1, key='4a')
 
 with col2:
-    st.plotly_chart(fig_conv_plot_2)
+    st.plotly_chart(fig_conv_plot_2, key='4b')
 
 
 #%% Subheader for Q5
@@ -719,9 +720,9 @@ if on_campaign:
         showlegend=False
     )
     # Display the plot in the Streamlit app
-    st.plotly_chart(fig_campaign_pareto)
+    st.plotly_chart(fig_campaign_pareto, key='6a')
 else:
-    st.plotly_chart(fig_campaign_conversion)
+    st.plotly_chart(fig_campaign_conversion, key='6b')
 
 # Show the data for reference
 st.markdown("<h3 style='font-size:18px;'>Campaign Conversion Data</h3>", unsafe_allow_html=True)
@@ -788,7 +789,7 @@ if on:
         width=1000,
         showlegend=False
     )
-    st.plotly_chart(fig_pareto_ov)
+    st.plotly_chart(fig_pareto_ov, key='6c')
 else:
     fig_campaign_ov = px.bar(
     campaign_ov_data,
@@ -812,7 +813,7 @@ else:
         showlegend=False
     )
 
-    st.plotly_chart(fig_campaign_ov)
+    st.plotly_chart(fig_campaign_ov, key='6d')
 
 #%%Subheader for Q7
 st.subheader('7. Which business units generate the highest quality leads?', divider='rainbow')
@@ -842,7 +843,7 @@ fig_bu_lead_quality.update_layout(
 col1, col2 = st.columns([1,1], gap="small")
 with col1:
     # Display the plot in the Streamlit app
-    st.plotly_chart(fig_bu_lead_quality)
+    st.plotly_chart(fig_bu_lead_quality, key='7a')
 with col2:
     # Show the grouped data for reference
     st.markdown("<h3 style='font-size:18px;'>Business Unit Lead Quality Data</h3>", unsafe_allow_html=True)
@@ -888,7 +889,7 @@ fig_residuals_bu = px.imshow(residuals_bu_df,
                              aspect="auto")
 
 # Display heatmap
-st.plotly_chart(fig_residuals_bu)
+st.plotly_chart(fig_residuals_bu, key='7b')
 
 st.write('Positive residuals indicate a higher observed count than expected, while negative residuals indicate a lower observed count than expected.')
 
@@ -932,7 +933,7 @@ fig_rejection_reasons.update_layout(
 )
 
 # Step 6: Display the plot
-st.plotly_chart(fig_rejection_reasons)
+st.plotly_chart(fig_rejection_reasons, key='8a')
 
 #%% Subheader for Q9
 st.subheader('9. How effective are different lead actions in converting leads to opportunities?', divider='rainbow')
@@ -958,7 +959,7 @@ fig_lead_action_stage.update_layout(
 )
 
 # Display the plot
-st.plotly_chart(fig_lead_action_stage)
+st.plotly_chart(fig_lead_action_stage, key='9a')
 
 # 3. Perform Chi-Square test to assess the relationship between Lead Action and Opportunity Stage
 # Create contingency table (cross-tabulation)
@@ -995,7 +996,7 @@ fig_residuals = px.imshow(residuals_df,
                           aspect="auto")
 
 # Display heatmap
-st.plotly_chart(fig_residuals)
+st.plotly_chart(fig_residuals, key='9b')
 
 st.write('Positive residuals indicate a higher observed count than expected, while negative residuals indicate a lower observed count than expected.')
 
@@ -1037,7 +1038,7 @@ fig_product_interest.update_layout(xaxis_title='Number of Leads',
                                    height=900)
 
 # Step 8: Display the plot in the Streamlit app
-st.plotly_chart(fig_product_interest)
+st.plotly_chart(fig_product_interest, key='10a')
 
 ##----------------------------------------------##
 ##-------------- M   Q   L  --------------------##
@@ -1099,7 +1100,7 @@ fig_source_conv.update_layout(
     width=1000
 )
 
-st.plotly_chart(fig_source_conv)
+st.plotly_chart(fig_source_conv, key='11a')
 #plotly.offline.plot(fig_source_conv)
 
 #%%What is the average lead scoring for each lead source?
@@ -1130,7 +1131,7 @@ fig_lead_score.update_layout(
     margin=dict(t=60, b=40, l=40, r=40)
 )
 
-st.plotly_chart(fig_lead_score)
+st.plotly_chart(fig_lead_score, key='12a')
 
 #%%What are the monthly trends in lead creation?
 st.subheader('13. What are the monthly trends in lead creation?', divider='rainbow')
@@ -1179,7 +1180,7 @@ fig_year_mql.update_layout(
 
 # Step 5: Display the plot in Streamlit
 #plotly.offline.plot(fig_year_mql)
-st.plotly_chart(fig_year_mql)
+st.plotly_chart(fig_year_mql, key='13a')
 
 #%%What are the monthly trends in lead creation?
 st.subheader('14. What is the average order amount associated with converted leads?', divider='rainbow')
@@ -1200,7 +1201,7 @@ fig_zone_amt = create_stacked_bar_ts(
 )
 
 # Show the plot
-st.plotly_chart(fig_zone_amt)
+st.plotly_chart(fig_zone_amt, key='14a')
 
 # Count leads and conversions (opportunities) by BU
 bu_amount_ts = filtered_data.groupby(['Year-Month', 'Business Unit']).agg(
@@ -1218,7 +1219,7 @@ fig_bu_amt = create_stacked_bar_ts(
 )
 
 # Show the plot
-st.plotly_chart(fig_bu_amt)
+st.plotly_chart(fig_bu_amt, key='14b')
 #plotly.offline.plot(fig_order)
 
 #%%What are the monthly trends in lead creation?
@@ -1252,7 +1253,7 @@ fig_cc.update_layout(
 )
 
 # Show the plot
-st.plotly_chart(fig_cc)
+st.plotly_chart(fig_cc, key='15a')
 
 #%%Which campaigns contribute the most to closed opportunities?
 st.subheader('16. Which campaigns contribute the most to closed opportunities?', divider='rainbow')
@@ -1305,7 +1306,7 @@ fig_camp_contrb.update_layout(
 )
 
 # Show the plot
-st.plotly_chart(fig_camp_contrb)
+st.plotly_chart(fig_camp_contrb, key='16a')
 
 
 #%%What is the time taken from lead creation to order promised date?
@@ -1344,7 +1345,7 @@ fig_crt_prom_heatmap.update_layout(
 )
 
 # Show the heatmap
-st.plotly_chart(fig_crt_prom_heatmap)
+st.plotly_chart(fig_crt_prom_heatmap, key='17a')
 
 #%%How often do leads in a specific business category convert?
 st.subheader('18. How often do leads in a specific business category convert?', divider='rainbow')
@@ -1387,7 +1388,7 @@ fig_biz_conv.update_layout(
 )
 
 # Show the plot
-st.plotly_chart(fig_biz_conv)
+st.plotly_chart(fig_biz_conv, key='18a')
 
 #%%Which user types (e.g., admin, sales) close the most opportunities?
 st.subheader('19. Which user types (e.g., admin, sales) close the most opportunities?', divider='rainbow')
@@ -1452,4 +1453,4 @@ for i, row in role_closed_opportunities.iterrows():
     )
 
 # Step 7: Display the plot in Streamlit
-st.plotly_chart(fig_role)
+st.plotly_chart(fig_role, key='19a')
