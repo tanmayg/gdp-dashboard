@@ -61,6 +61,7 @@ def format_euro(value):
 # Load your dataframe
 @st.cache_data
 def load_data():
+    #with open('./LeadAnalysis/lead_app_data.pkl', 'rb') as file:
     with open(Path(__file__).parent/'data/lead_app_data.pkl', 'rb') as file:
         loaded_dataframes = pickle.load(file)
     return loaded_dataframes
@@ -208,71 +209,97 @@ replacements_stage = {
 lead_univ['Opportunity Stage'] = lead_univ['Opportunity Stage'].replace(replacements_stage)
 lead_data_opp['Opportunity Stage'] = lead_data_opp['Opportunity Stage'].replace(replacements)
 
-# Initialize session state for the filters
-if 'start_date' not in st.session_state:
-    st.session_state.start_date = lead_univ['Lead Creation Date'].min()
-if 'end_date' not in st.session_state:
-    st.session_state.end_date = lead_univ['Lead Creation Date'].max()
-
 #%%Define filters in sidebar panel
 # Streamlit app code
 st.sidebar.title('Leads Data Analysis')
 
-# Sidebar filters
-#st.sidebar.header('Filters')
-
-# Date filter using session state values
-#start_date = st.sidebar.date_input('Start date', lead_univ['Lead Creation Date'].min())
-
 start_date = st.sidebar.date_input('Start date', datetime.date(2022, 9, 1))
 end_date = st.sidebar.date_input('End date', lead_univ['Lead Creation Date'].max())
 
-# Create sidebar multi-select filter for 'Business Unit'
+# Helper function to handle 'All' option in multi-select
+def handle_multiselect_old(options, selected):
+    # If 'All' is selected and other options are selected, deselect 'All'
+    if 'All' in selected and len(selected) > 1:
+        selected.remove('All')
+    # If nothing else is selected, keep 'All' selected
+    elif not selected:
+        selected = ['All']
+    # If 'All' is selected, return all options but remove 'All' from the displayed selected items
+    #return [option for option in selected if option != 'All']
+    if selected == ['All']:
+        return options
+    return selected
+
+# Helper function to handle 'All' option in multi-select
+def handle_multiselect(options, selected):
+    # If 'All' is selected, return all options
+    if 'All' in selected:
+        return options
+    # Otherwise, return the selected values
+    else:
+        return selected
+
+
+# Get all unique zones from lead_univ['Zone']
+all_zones = lead_univ['Zone'].unique().tolist()
+zone_options = ['All'] + all_zones  # Add 'All' option
+# Create sidebar multi-select filter for 'Zone'
 zone_filter = st.sidebar.multiselect(
     'Select Zone', 
-    options=lead_univ['Zone'].unique(), 
-    default=lead_univ['Zone'].unique()
+    options=zone_options, 
+    default=['All']  # Default to 'All'
 )
+# Handle 'All' option
+zone_filter = handle_multiselect(all_zones, zone_filter)
 
+
+# For Business Units
+business_units_options = ['All'] + business_units  # Add 'All' option
 # Create sidebar multi-select filter for 'Business Unit'
 bu_filter = st.sidebar.multiselect(
     'Select BU', 
-    options=business_units, 
-    default=business_units
+    options=business_units_options, 
+    default=['All']  # Default to 'All'
 )
 
-#create sidebar multi-select filter for '[Campaign - Channel]'
-cmpgn_chnnl = ['Event Marketing', 'Website', 'Search (Paid)', 'Landing Page', 'Email Marketing', 'Public Relations', 'Outbound Call Sales', 'Event', 'Social Media (Paid)', 'Search (Display)', 'Trade show', np.nan]
+# Handle 'All' option
+bu_filter = handle_multiselect(business_units, bu_filter)
+
+# For Campaign Channels
+cmpgn_chnnl = ['Event Marketing', 'Website', 'Search (Paid)', 'Landing Page', 'Email Marketing', 
+               'Public Relations', 'Outbound Call Sales', 'Event', 'Social Media (Paid)', 
+               'Search (Display)', 'Trade show', np.nan]
+
+cmpgn_chnnl_options = ['All'] + cmpgn_chnnl  # Add 'All' option
+# Create sidebar multi-select filter for 'Campaign Channel'
 chnnl_filter = st.sidebar.multiselect(
     'Select Campaign Channel', 
-    options=cmpgn_chnnl, 
-    default=cmpgn_chnnl
+    options=cmpgn_chnnl_options, 
+    default=['All']  # Default to 'All'
 )
-
-# Add Clear All button
-if st.sidebar.button('Clear All'):
-    st.session_state.start_date = datetime.date(2022, 9, 1) #lead_univ['Lead Creation Date'].min()
-    st.session_state.end_date = lead_univ['Lead Creation Date'].max()
-    st.rerun()  # Refresh the app to apply the reset values
+# Handle 'All' option
+chnnl_filter = handle_multiselect(cmpgn_chnnl, chnnl_filter)
 
 # Filter data by date range
 filtered_data = lead_univ[(lead_univ['Lead Creation Date'] >= start_date) & (lead_univ['Lead Creation Date'] <= end_date)]
 filtered_opp = lead_data_opp[(lead_data_opp['Lead Creation Date'] >= start_date) & (lead_data_opp['Lead Creation Date'] <= end_date)]
 
-# Filter data by zone
-filtered_data = filtered_data[filtered_data['Zone'].isin(zone_filter)]
-filtered_opp = filtered_opp[filtered_opp['Zone'].isin(zone_filter)]
-# Filter data by BU
-filtered_data = filtered_data[filtered_data['Business Unit'].isin(bu_filter)]
-filtered_opp = filtered_opp[filtered_opp['Business Unit'].isin(bu_filter)]
-# Filter data by Campaign Channel
-filtered_data = filtered_data[filtered_data['[Campaign - Channel]'].isin(chnnl_filter)]
-filtered_opp = filtered_opp[filtered_opp['[Campaign - Channel]'].isin(chnnl_filter)]
+# Filter data by Zone, Business Unit, and Campaign Channel
+filtered_data = filtered_data[
+    (filtered_data['Zone'].isin(zone_filter)) &
+    (filtered_data['Business Unit'].isin(bu_filter)) &
+    (filtered_data['[Campaign - Channel]'].isin(chnnl_filter))
+]
+
+filtered_opp = filtered_opp[
+    (filtered_opp['Zone'].isin(zone_filter)) &
+    (filtered_opp['Business Unit'].isin(bu_filter)) &
+    (filtered_opp['[Campaign - Channel]'].isin(chnnl_filter))
+]
 
 #---------------------------------------------------------------#
 #------------------ P   L   O   T   S   ------------------------#
 #---------------------------------------------------------------#
-
 
 #%% Subheader for Q1
 st.subheader('1. Which zones generate the most leads?', divider='rainbow')
@@ -552,92 +579,127 @@ with col2:
 #%% Subheader for Q4
 st.subheader('4. What is the average time to convert a Marketing Qualified Lead (MQL) to an opportunity?', divider='rainbow')
 
-# Helper function to create a time series plot
-def create_time_series_comp(data, time_column, value_column, color_column, title, yaxis_title):
-    fig = px.line(
-        data,
-        x=time_column,
-        y=value_column,
-        color=color_column,
-        title=title,
-        labels={value_column: yaxis_title}
-    )
-    # Move the legend below the plot
-    fig.update_layout(
-        width=500,
-        legend=dict(orientation="h", yanchor="bottom", y=-0.5, xanchor="center", x=0.5)  # Adjust legend position
-    )
-    return fig
+# Convert end_date to 'Year-Month' format (YYYY-MM)
+end_year = end_date.year
+end_month = end_date.month
 
-# Prepare the data for plotting
+# Step 1: Map abbreviated month names to their corresponding numbers
+month_mapping = {'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6,
+                 'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12}
+
+# Step 2: Convert the 'Month' column in filtered_data to numeric months using the mapping
+filtered_data['Month_Num'] = filtered_data['Month'].map(month_mapping)
+
+# Helper function to calculate the previous year date
+def get_previous_year(year):
+    return year - 1
+
+# Filter data for the current year and previous year (YTD)
 filtered_data['MQL to Opp. Lead Velocity (Days)'] = filtered_data['MQL to Opp. Lead Velocity (Days)'].replace('-', np.nan).astype(float)
 
-# Prepare grouped data for Zone, Business Unit, and Campaign Channel
-conv_data = filtered_data.groupby(['Year-Month', 'Zone', 'Business Unit', '[Campaign - Channel]'])['MQL to Opp. Lead Velocity (Days)'].mean().reset_index()
-conv_data['Year-Month'] = conv_data['Year-Month'].astype(str)
-conv_data = conv_data.rename(columns={'[Campaign - Channel]': 'Campaign Channel', 'MQL to Opp. Lead Velocity (Days)': 'avg_conversion_time'})
-conv_data['avg_conversion_time'] = conv_data['avg_conversion_time'].round(2)
+# Filter for the current year (up to selected month)
+current_year_data = filtered_data[(filtered_data['Year'] == end_year) & (filtered_data['Month_Num'] <= end_month)]
 
+# Filter for the previous year (up to the same month)
+previous_year_data = filtered_data[(filtered_data['Year'] == get_previous_year(end_year)) & (filtered_data['Month_Num'] <= end_month)]
 
-col1, col2 = st.columns(2)
+# Step 2: Group by 'Campaign Channel' and calculate the YTD average for both years
+current_year_agg = current_year_data.groupby('[Campaign - Channel]').agg(
+    avg_conversion_time=('MQL to Opp. Lead Velocity (Days)', 'mean')
+).reset_index()
 
-# Dropdowns for Plot 1
-with col1:
-    st.markdown("<h3 style='font-size:18px;'>Select Values for Plot 1</h3>", unsafe_allow_html=True)
-    selected_zone_1 = st.selectbox("Zone", conv_data['Zone'].unique(), key='q4az')
-    selected_bu_1 = st.selectbox("Business Unit", conv_data['Business Unit'].unique(), key='q4ab')
-    selected_channel_1 = st.selectbox("Campaign Channel", conv_data['Campaign Channel'].unique(), key='q4ac')
+previous_year_agg = previous_year_data.groupby('[Campaign - Channel]').agg(
+    avg_conversion_time=('MQL to Opp. Lead Velocity (Days)', 'mean')
+).reset_index()
 
-# Dropdowns for Plot 2
-with col2:
-    st.markdown("<h3 style='font-size:18px;'>Select Values for Plot 2</h3>", unsafe_allow_html=True)
-    selected_zone_2 = st.selectbox("Zone", conv_data['Zone'].unique(), key='q4bz')
-    selected_bu_2 = st.selectbox("Business Unit", conv_data['Business Unit'].unique(), key='q4bb')
-    selected_channel_2 = st.selectbox("Campaign Channel", conv_data['Campaign Channel'].unique(), key='q4bc')
-
-# Step 2: Filter the data based on the user's selections for Plot 1
-filtered_data_plot_1 = conv_data[
-    (conv_data['Zone'] == selected_zone_1) &
-    (conv_data['Business Unit'] == selected_bu_1) &
-    (conv_data['Campaign Channel'] == selected_channel_1)
-]
-
-# Step 3: Filter the data based on the user's selections for Plot 2
-filtered_data_plot_2 = conv_data[
-    (conv_data['Zone'] == selected_zone_2) &
-    (conv_data['Business Unit'] == selected_bu_2) &
-    (conv_data['Campaign Channel'] == selected_channel_2)
-]
-
-# Step 4: Create the first plot
-fig_conv_plot_1 = create_time_series_comp(
-    data=filtered_data_plot_1,
-    time_column='Year-Month',
-    value_column='avg_conversion_time',
-    color_column='Zone',  # Since we're filtering on Zone, BU, and Channel
-    title=f'Avg MQL to Opportunity Conversion Time for {selected_zone_1}, {selected_bu_1}, {selected_channel_1}',
-    yaxis_title='Avg Conversion Time (Days)'
+# Step 3: Merge current and previous year data on 'Campaign Channel'
+conversion_data = pd.merge(
+    previous_year_agg.rename(columns={'avg_conversion_time': 'prev_year_avg_conversion_time'}),
+    current_year_agg.rename(columns={'avg_conversion_time': 'current_year_avg_conversion_time'}),
+    on='[Campaign - Channel]',
+    how='inner'
 )
 
-# Step 5: Create the second plot
-fig_conv_plot_2 = create_time_series_comp(
-    data=filtered_data_plot_2,
-    time_column='Year-Month',
-    value_column='avg_conversion_time',
-    color_column='Zone',  # Since we're filtering on Zone, BU, and Channel
-    title=f'Avg MQL to Opportunity Conversion Time for {selected_zone_2}, {selected_bu_2}, {selected_channel_2}',
-    yaxis_title='Avg Conversion Time (Days)'
+end_month_label = end_date.strftime('%Y-%m')
+previous_year_label = f"{get_previous_year(end_year)}-{end_month:02d}"
+
+# Step 4: Create the candlestick chart
+candlestick = go.Figure()
+
+# Add candlestick trace
+candlestick.add_trace(go.Candlestick(
+    x=conversion_data['[Campaign - Channel]'],  # x-axis is the Campaign Channel
+    open=conversion_data['prev_year_avg_conversion_time'],  # previous year YTD value
+    close=conversion_data['current_year_avg_conversion_time'],  # current year YTD value
+    low=conversion_data[['prev_year_avg_conversion_time', 'current_year_avg_conversion_time']].min(axis=1),  # min between current and previous
+    high=conversion_data[['prev_year_avg_conversion_time', 'current_year_avg_conversion_time']].max(axis=1),  # max between current and previous
+    increasing_line_color='red',  # green for decreasing avg conversion time
+    decreasing_line_color='green',  # red for increasing avg conversion time
+    showlegend=False
+))
+
+# Step 5: Add text annotations for the previous year and current year
+for i, row in conversion_data.iterrows():
+    # Add text label for previous year value
+    candlestick.add_annotation(
+        x=row['[Campaign - Channel]'],
+        y=row['prev_year_avg_conversion_time'],
+        #text=f"{previous_year_label}: {row['prev_year_avg_conversion_time']:.1f} d",
+        text=f"From: {row['prev_year_avg_conversion_time']:.1f} days ({previous_year_label})",
+        showarrow=False,
+        yshift=10,
+        font=dict(color="white", size=10)
+    )
+    
+    # Add text label for current year value
+    candlestick.add_annotation(
+        x=row['[Campaign - Channel]'],
+        y=row['current_year_avg_conversion_time'],
+        #text=f"{end_month_label}: {row['current_year_avg_conversion_time']:.1f} d",
+        text=f"To: {row['current_year_avg_conversion_time']:.1f} days ({end_month_label})",
+        showarrow=False,
+        yshift=-15,
+        font=dict(color="white", size=10)
+    )
+    
+    # Step 6: Add arrows to show increase or decrease
+    if row['current_year_avg_conversion_time'] <= row['prev_year_avg_conversion_time']:
+        arrow_color = 'green'
+        arrow_direction = -20
+        arrow_side= 'start'
+    else:
+        arrow_color = 'red'
+        arrow_direction = 20
+        arrow_side= 'end'
+    
+    # Add arrow annotation
+    candlestick.add_annotation(
+        x=row['[Campaign - Channel]'],
+        y=(row[['prev_year_avg_conversion_time', 'current_year_avg_conversion_time']].mean()),  # arrow between previous and current year
+        axref='x',
+        ay=row['prev_year_avg_conversion_time'],
+        ax=row['[Campaign - Channel]'],
+        #yshift=arrow_direction,
+        arrowhead=3, #3
+        arrowsize=1.5,
+        arrowwidth=2,
+        arrowside=arrow_side,
+        arrowcolor=arrow_color
+    )
+
+# Customize the layout
+candlestick.update_layout(
+    title="YTD Change in Average MQL to Opportunity Conversion Time by Campaign Channel",
+    xaxis_title="Campaign Channel",
+    yaxis_title="Avg Conversion Time (Days)",
+    xaxis_rangeslider_visible=False,
+    margin=dict(t=60, b=100, l=40, r=40),
+    height=600,
+    width=800
 )
 
-
-# Step 4: Display the plots side by side for comparison
-col1, col2 = st.columns(2)
-with col1:
-    st.plotly_chart(fig_conv_plot_1, key='4a')
-
-with col2:
-    st.plotly_chart(fig_conv_plot_2, key='4b')
-
+# Step 4: Display the plots
+st.plotly_chart(candlestick, key='4a')
 
 #%% Subheader for Q5
 
@@ -843,7 +905,7 @@ fig_bu_lead_quality.update_layout(
 col1, col2 = st.columns([1,1], gap="small")
 with col1:
     # Display the plot in the Streamlit app
-    st.plotly_chart(fig_bu_lead_quality, key='7a')
+    st.plotly_chart(fig_bu_lead_quality, use_container_width=True, key='7a')
 with col2:
     # Show the grouped data for reference
     st.markdown("<h3 style='font-size:18px;'>Business Unit Lead Quality Data</h3>", unsafe_allow_html=True)
@@ -855,7 +917,8 @@ with col2:
         # Fill NaN with 0 for display purposes
         pivot_bu_lead_quality = pivot_bu_lead_quality.fillna(0).astype(int)
         st.dataframe(pivot_bu_lead_quality)
-    
+
+
 # Create a contingency table for 'Business Unit' and 'Lead Qualification Level'
 contingency_table_bu = pd.crosstab(filtered_data['Business Unit'], filtered_data['Lead Qualification Level'])
 
@@ -865,33 +928,36 @@ chi2_stat_bu, p_val_bu, dof_bu, expected_bu = stats.chi2_contingency(contingency
 # 2. Calculate standardized residuals (Observed - Expected / sqrt(Expected))
 observed_bu = contingency_table_bu.values
 residuals_bu = (observed_bu - expected_bu) / np.sqrt(expected_bu)
+    
+on_chisq_q7 = st.toggle("View Statistical Test of Association", key='chiq7')
 
-# 3. Display the result of the Chi-Square test
-st.markdown("<h3 style='font-size:18px;'>Chi-Square Test of Association between Business Unit vs Lead Qualification Level</h3>", unsafe_allow_html=True)
-st.write(f"Chi-Square Statistic: {chi2_stat_bu:.2f}, Degrees of Freedom: {dof_bu}, P-Value: {p_val_bu:.4f}")
-
-# Conclusion based on the P-value
-if p_val_bu < 0.05:
-    st.write("Conclusion: There is a significant relationship between Business Unit and Lead Qualification Level.")
-else:
-    st.write("Conclusion: There is NO significant relationship between Business Unit and Lead Qualification Level.")
-
-# 4. Create a DataFrame for residuals and plot the heatmap to visualize significant relationships
-residuals_bu_df = pd.DataFrame(residuals_bu, index=contingency_table_bu.index, columns=contingency_table_bu.columns)
-
-# Flatten the residuals dataframe for plotting
-residuals_bu_flat = residuals_bu_df.reset_index().melt(id_vars='Business Unit', var_name='Lead Qualification Level', value_name='Residual')
-
-# 5. Plot residuals as a heatmap using Plotly
-fig_residuals_bu = px.imshow(residuals_bu_df, 
-                             title="Standardized Residuals: Business Unit vs Lead Qualification Level",
-                             labels=dict(color="Standardized Residual"),
-                             aspect="auto")
-
-# Display heatmap
-st.plotly_chart(fig_residuals_bu, key='7b')
-
-st.write('Positive residuals indicate a higher observed count than expected, while negative residuals indicate a lower observed count than expected.')
+if on_chisq_q7:
+    # 3. Display the result of the Chi-Square test
+    st.markdown("<h3 style='font-size:18px;'>Chi-Square Test of Association between Business Unit vs Lead Qualification Level</h3>", unsafe_allow_html=True)
+    st.write(f"Chi-Square Statistic: {chi2_stat_bu:.2f}, Degrees of Freedom: {dof_bu}, P-Value: {p_val_bu:.4f}")
+    
+    # Conclusion based on the P-value
+    if p_val_bu < 0.05:
+        st.write("Conclusion: There is a significant relationship between Business Unit and Lead Qualification Level.")
+    else:
+        st.write("Conclusion: There is NO significant relationship between Business Unit and Lead Qualification Level.")
+    
+    # 4. Create a DataFrame for residuals and plot the heatmap to visualize significant relationships
+    residuals_bu_df = pd.DataFrame(residuals_bu, index=contingency_table_bu.index, columns=contingency_table_bu.columns)
+    
+    # Flatten the residuals dataframe for plotting
+    residuals_bu_flat = residuals_bu_df.reset_index().melt(id_vars='Business Unit', var_name='Lead Qualification Level', value_name='Residual')
+    
+    # 5. Plot residuals as a heatmap using Plotly
+    fig_residuals_bu = px.imshow(residuals_bu_df, 
+                                 title="Standardized Residuals: Business Unit vs Lead Qualification Level",
+                                 labels=dict(color="Standardized Residual"),
+                                 aspect="auto")
+    
+    # Display heatmap
+    st.plotly_chart(fig_residuals_bu, key='7b')
+    
+    st.write('Positive residuals indicate a higher observed count than expected, while negative residuals indicate a lower observed count than expected.')
 
 
 #%%# Subheader for Q8
@@ -961,44 +1027,47 @@ fig_lead_action_stage.update_layout(
 # Display the plot
 st.plotly_chart(fig_lead_action_stage, key='9a')
 
-# 3. Perform Chi-Square test to assess the relationship between Lead Action and Opportunity Stage
-# Create contingency table (cross-tabulation)
-contingency_table = pd.crosstab(filtered_data['Lead Action'], filtered_data['Opportunity Stage'])
+on_chisq_q9 = st.toggle("View Statistical Test of Association", key='chiq9')
 
-# Perform Chi-Square Test
-chi2_stat, p_val, dof, ex = stats.chi2_contingency(contingency_table)
-
-# 4. Compute standardized residuals (Observed - Expected / sqrt(Expected))
-observed = contingency_table.values
-expected = ex
-residuals = (observed - expected) / np.sqrt(expected)
-
-# Display the result of the Chi-Square test
-st.markdown("<h3 style='font-size:18px;'>Chi-Square Test of Association between Lead Action vs Opportunity Stage</h3>", unsafe_allow_html=True)
-st.write(f"Chi-Square Statistic: {chi2_stat:.2f}, Degrees of Freedom: {dof}, P-Value: {p_val:.4f}")
-
-# Conclusion based on the P-value
-if p_val < 0.05:
-    st.write("Conclusion: There is a significant relationship between Lead Action and Opportunity Stage.")
-else:
-    st.write("Conclusion: There is no significant relationship between Lead Action and Opportunity Stage.")
-
-# 5. Display residuals as a heatmap to identify specific relationships
-residuals_df = pd.DataFrame(residuals, index=contingency_table.index, columns=contingency_table.columns)
-
-# Flatten the residuals dataframe for plotting
-residuals_flat = residuals_df.reset_index().melt(id_vars='Lead Action', var_name='Opportunity Stage', value_name='Residual')
-
-# Plot residuals as heatmap using Plotly
-fig_residuals = px.imshow(residuals_df, 
-                          title="Standardized Residuals: Lead Action vs. Opportunity Stage",
-                          labels=dict(color="Standardized Residual"),
-                          aspect="auto")
-
-# Display heatmap
-st.plotly_chart(fig_residuals, key='9b')
-
-st.write('Positive residuals indicate a higher observed count than expected, while negative residuals indicate a lower observed count than expected.')
+if on_chisq_q9:
+    # 3. Perform Chi-Square test to assess the relationship between Lead Action and Opportunity Stage
+    # Create contingency table (cross-tabulation)
+    contingency_table = pd.crosstab(filtered_data['Lead Action'], filtered_data['Opportunity Stage'])
+    
+    # Perform Chi-Square Test
+    chi2_stat, p_val, dof, ex = stats.chi2_contingency(contingency_table)
+    
+    # 4. Compute standardized residuals (Observed - Expected / sqrt(Expected))
+    observed = contingency_table.values
+    expected = ex
+    residuals = (observed - expected) / np.sqrt(expected)
+    
+    # Display the result of the Chi-Square test
+    st.markdown("<h3 style='font-size:18px;'>Chi-Square Test of Association between Lead Action vs Opportunity Stage</h3>", unsafe_allow_html=True)
+    st.write(f"Chi-Square Statistic: {chi2_stat:.2f}, Degrees of Freedom: {dof}, P-Value: {p_val:.4f}")
+    
+    # Conclusion based on the P-value
+    if p_val < 0.05:
+        st.write("Conclusion: There is a significant relationship between Lead Action and Opportunity Stage.")
+    else:
+        st.write("Conclusion: There is no significant relationship between Lead Action and Opportunity Stage.")
+    
+    # 5. Display residuals as a heatmap to identify specific relationships
+    residuals_df = pd.DataFrame(residuals, index=contingency_table.index, columns=contingency_table.columns)
+    
+    # Flatten the residuals dataframe for plotting
+    residuals_flat = residuals_df.reset_index().melt(id_vars='Lead Action', var_name='Opportunity Stage', value_name='Residual')
+    
+    # Plot residuals as heatmap using Plotly
+    fig_residuals = px.imshow(residuals_df, 
+                              title="Standardized Residuals: Lead Action vs. Opportunity Stage",
+                              labels=dict(color="Standardized Residual"),
+                              aspect="auto")
+    
+    # Display heatmap
+    st.plotly_chart(fig_residuals, key='9b')
+    
+    st.write('Positive residuals indicate a higher observed count than expected, while negative residuals indicate a lower observed count than expected.')
 
 #%% Subheader for Q10
 st.subheader('10. What are the popular products of interest among leads?', divider='rainbow')
@@ -1047,59 +1116,89 @@ st.plotly_chart(fig_product_interest, key='10a')
 #%%11. Which lead sources have the highest conversion rates?
 st.subheader('11. Which lead sources have the highest conversion rates?', divider='rainbow')
 
-# Step 1: Group by 'Lead Source Original' and calculate conversion rates
-conversion_data = filtered_data.groupby(['Year-Month', 'Lead Source Original']).agg(
-    total_mqls=('YTD MQLs', lambda x: x.sum()),
-    total_opp=('Opportunity ID', lambda x: x.notna().sum())
+# Convert end_date to 'Year-Month' format (YYYY-MM)
+end_year = end_date.year
+end_month = end_date.month
+
+# Step 1: Map abbreviated month names to their corresponding numbers
+month_mapping = {'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6,
+                 'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12}
+
+# Step 2: Convert the 'Month' column in filtered_data to numeric months using the mapping
+filtered_data['Month_Num'] = filtered_data['Month'].map(month_mapping)
+
+# Function to calculate previous year
+def get_previous_year(year):
+    return year - 1
+
+# Step 3: Filter the data for the current year and previous year, up to the selected end month
+current_year_data = filtered_data[(filtered_data['Year'] == end_year) & (filtered_data['Month_Num'] <= end_month)]
+previous_year_data = filtered_data[(filtered_data['Year'] == get_previous_year(end_year)) & (filtered_data['Month_Num'] <= end_month)]
+
+# Group by Lead Source and calculate cumulative metrics for YTD comparison
+current_year_agg = current_year_data.groupby('Lead Source Original').agg(
+    total_mqls=('YTD MQLs', 'sum'),
+    converted_leads=('Opportunity ID', lambda x: x.notna().sum())
 ).reset_index()
 
-conversion_opp = filtered_opp.groupby(['Year-Month', 'Lead Source Original']).agg(
-    total_opp_val=('Opportunity Amount Updated', 'sum')
+previous_year_agg = previous_year_data.groupby('Lead Source Original').agg(
+    total_mqls=('YTD MQLs', 'sum'),
+    converted_leads=('Opportunity ID', lambda x: x.notna().sum())
 ).reset_index()
 
-conversion_data = pd.merge(conversion_data, conversion_opp, how='left')
+# Add the 'Year' column for differentiation between current and previous year
+current_year_agg['Year'] = end_year
+previous_year_agg['Year'] = get_previous_year(end_year)
 
-# Step 2: Calculate conversion rate as a percentage
-conversion_data['opp_val_per_opp'] = round((conversion_data['total_opp_val'] / conversion_data['total_opp']), 2)
-# Format the opp_val_per_opp for display as Euro value
-conversion_data['opp_val_per_opp_formatted'] = conversion_data['opp_val_per_opp'].apply(format_euro)
-# Convert 'Year-Month' to string for proper display on x-axis
-conversion_data['Year-Month'] = conversion_data['Year-Month'].astype(str)
+# Calculate conversion rates
+current_year_agg['conversion_rate'] = round((current_year_agg['converted_leads'] / current_year_agg['total_mqls']) * 100, 0)
+previous_year_agg['conversion_rate'] = round((previous_year_agg['converted_leads'] / previous_year_agg['total_mqls']) * 100, 0)
 
-# Step 4: Create a bubble chart with lead count as the bubble size
-fig_source_conv = px.scatter(conversion_data, 
-                 x='Year-Month', 
-                 y='opp_val_per_opp', 
-                 size='total_mqls',  # Bubble size represents total leads
-                 color='Lead Source Original',
-                 text='opp_val_per_opp_formatted',  # Show conversion rate as text
-                 hover_data={'total_mqls': True, 'total_opp': True},  # Show extra info on hover
-                 title="Per Opportunity Value over Time by Lead Source",
-                 labels={'opp_val_per_opp': 'Opportunity Value per Opportunity (€)', 'Lead Source Original': 'Lead Source'},
-                 size_max=50)  # Set max bubble size for visibility
+# Combine both datasets into one for plotting
+combined_data = pd.concat([current_year_agg, previous_year_agg])
+combined_data['Year'] = combined_data['Year'].astype(str)
 
-# Customize the layout
-fig_source_conv.update_traces(textposition='middle center', textfont_size=12)
+# Create the bubble chart with discrete colors
+fig_source_conv = px.scatter(
+    combined_data,
+    x='Lead Source Original',  # X-axis: Lead Source Original
+    y='conversion_rate',  # Y-axis: Conversion rate
+    size='total_mqls',  # Bubble size: total MQLs
+    color='Year',  # Color by Year (discrete colors)
+    #color_discrete_sequence=px.colors.qualitative.Set1,  # Use a qualitative color scheme for discrete colors
+    hover_data={'total_mqls': True, 'converted_leads': True},  # Show additional data on hover
+    text='conversion_rate',  # Display conversion rate as text
+    title=f"YTD Conversion Rates (01 to {end_month:02d}-{end_year}) vs YTD {get_previous_year(end_year)}",
+    labels={'conversion_rate': 'Conversion Rate (%)', 'Lead Source Original': 'Lead Source'},
+    size_max=60  # Max bubble size for better visibility
+)
 
-# Add an annotation to explain bubble size
+# Customize layout
+fig_source_conv.update_traces(
+    texttemplate='%{text:.0f}%',  # Show percentage values
+    textposition='middle center'  # Position the text inside the bubbles
+)
+
+# Add annotation explaining the bubble size
 fig_source_conv.add_annotation(
-    text="Bubble size represents number of MQLs",
+    text="(Bubble size represents number of MQLs)",
     xref="paper", yref="paper",
-    x=.95, y=1.1, showarrow=False,
+    x=-.05, y=1.05, showarrow=False,
     font=dict(size=14),
     align="left"
 )
 
+# Update layout
 fig_source_conv.update_layout(
-    yaxis_title="Opportunity Value per Opportunity (€)",
-    xaxis_title="Year-Month",
+    yaxis_title="Conversion Rate (%)",
+    xaxis_title="Lead Source",
     showlegend=True,
     uniformtext_minsize=8,
     uniformtext_mode='hide',
-    margin=dict(t=60, b=40, l=40, r=40),
-    width=1000
+    margin=dict(t=60, b=40, l=40, r=40)
 )
 
+# Display the plot in the Streamlit app
 st.plotly_chart(fig_source_conv, key='11a')
 #plotly.offline.plot(fig_source_conv)
 
@@ -1156,6 +1255,9 @@ mqls_sum['Month'] = pd.Categorical(mqls_sum['Month'], categories=months_order, o
 
 # Step 5: Sort the DataFrame by 'Month' to ensure correct order
 mqls_sum = mqls_sum.sort_values('Month')
+
+#Filter for 2022
+mqls_sum = mqls_sum.loc[mqls_sum['Year']>2022,].reset_index(drop=True)
 
 # Step 4: Plot the data using Plotly
 fig_year_mql = px.line(
@@ -1321,22 +1423,24 @@ filtered_data['Time Difference (Days)'] = (filtered_data['Opportunity Order Prom
 
 # Step 3: Group by 'Business Unit' and 'Zone' to calculate the mean time difference
 time_diff_by_bu_zone = filtered_data.groupby(['Business Unit', 'Zone']).agg(
-    mean_time_diff=('Time Difference (Days)', 'mean')
+    mean_time_diff=('Time Difference (Days)', lambda x: round(x.mean(), 0))
 ).reset_index()
 
-# Step 4: Create a heatmap with 'Business Unit' on y-axis and 'Zone' on x-axis
-fig_crt_prom_heatmap = px.density_heatmap(
-    time_diff_by_bu_zone,
-    x='Zone',
-    y='Business Unit',
-    z='mean_time_diff',  # Color intensity based on mean time difference
-    color_continuous_scale='Viridis',  # Choose a color scale, can be adjusted
-    title="Mean Time Difference from Lead Creation to Order Promised by Business Unit and Zone",
-    labels={'mean_time_diff': 'Mean Time Difference (Days)'},
+# Step 4: Pivot the data to create a matrix for the heatmap
+heatmap_data = time_diff_by_bu_zone.pivot(index='Business Unit', columns='Zone', values='mean_time_diff')
+
+# Step 5: Create the heatmap using px.imshow to include annotations
+fig_crt_heat = px.imshow(
+    heatmap_data,
+    color_continuous_scale='Viridis',
+    text_auto=True,  # Automatically adds rounded value labels
+    aspect="auto",  # Adjust aspect ratio
+    labels=dict(x="Zone", y="Business Unit", color="Mean Time (Days)")
 )
 
-# Customize layout
-fig_crt_prom_heatmap.update_layout(
+# Step 6: Customize layout for better readability
+fig_crt_heat.update_layout(
+    title="Mean Time Difference from Lead Creation to Order Promised by Business Unit and Zone",
     xaxis_title="Zone",
     yaxis_title="Business Unit",
     coloraxis_colorbar=dict(title="Mean Time (Days)"),
@@ -1345,46 +1449,53 @@ fig_crt_prom_heatmap.update_layout(
 )
 
 # Show the heatmap
-st.plotly_chart(fig_crt_prom_heatmap, key='17a')
+st.plotly_chart(fig_crt_heat, key='17t')
 
 #%%How often do leads in a specific business category convert?
-st.subheader('18. How often do leads in a specific business category convert?', divider='rainbow')
+st.subheader('18. How often do leads in a specific business category convert (or ACTIVE)?', divider='rainbow')
 
 # Step 2: Add a column to flag whether the opportunity is closed
 filtered_data['Converted'] = ~filtered_data['Opportunity Stage'].isin(['ACTIVE'])
 
-# Step 3: Group by 'Business Category' and calculate total leads and total closed opportunities
-conversion_data = filtered_data.groupby('Business Category').agg(
-    total_leads=('Lead ID', 'size'),  # Count total leads for each Business Category
-    total_converted=('Converted', 'sum')  # Count converted leads for each Business Category
+# Step 3: Group by 'Business Unit' and calculate total leads and total closed opportunities
+conversion_data = filtered_data.groupby('Business Unit').agg(
+    total_leads=('Lead ID', 'size'),  # Count total leads for each Business Unit
+    total_converted=('Converted', 'sum')  # Count converted leads for each Business Unit
 ).reset_index()
 
 # Step 4: Calculate conversion rate as a percentage
 conversion_data['Conversion Rate (%)'] = (conversion_data['total_converted'] / conversion_data['total_leads']) * 100
 
-#remove the ones with zero values
-conversion_data = conversion_data[conversion_data['Conversion Rate (%)']>0]
+# Remove the ones with zero values
+conversion_data = conversion_data[conversion_data['Conversion Rate (%)'] > 0]
 
-# Step 5: Create a bar chart to visualize the conversion rate by Business Category
+# Step 5: Create a custom label for each bar
+conversion_data['Label'] = conversion_data.apply(
+    lambda row: f"{row['Conversion Rate (%)']:.0f}% (Leads: {row['total_leads']})", axis=1
+)
+
+# Step 6: Create a horizontal bar chart to visualize the conversion rate by Business Unit
 fig_biz_conv = px.bar(
     conversion_data,
-    x='Business Category',
-    y='Conversion Rate (%)',
-    #title="Lead-to-Opportunity Conversion Rate by Business Category",
-    labels={'Conversion Rate (%)': 'Conversion Rate (%)', 'Business Category': 'Business Category'},
-    #text='Conversion Rate (%)'  # Display the conversion rate on the bars
+    y='Business Unit',  # Business Unit on the y-axis (for horizontal orientation)
+    x='Conversion Rate (%)',  # Conversion rate on the x-axis
+    text='Label',  # Display the custom label (Conversion Rate + Total Leads)
+    orientation='h',  # Set orientation to horizontal
+    labels={'Conversion Rate (%)': 'Conversion Rate (%)', 'Business Unit': 'Business Unit'}
+)
+
+# Customize layout to show labels and adjust appearance
+fig_biz_conv.update_traces(
+    textposition='inside'  # Display the labels outside the bars for better readability
 )
 
 # Customize layout
-#fig_biz_conv.update_traces(texttemplate='%{text:.1f}%', textposition='outside')
-
 fig_biz_conv.update_layout(
-    yaxis_title="Conversion Rate (%)",
-    xaxis_title="Business Category",
-    xaxis={'categoryorder': 'total descending'},
+    xaxis_title="Conversion Rate (%)",
+    yaxis_title="Business Unit",
+    yaxis={'categoryorder': 'total ascending'},  # Sort y-axis in descending order based on conversion rate
     margin=dict(t=60, b=100, l=40, r=40),
-    height=600,  # Adjust height as needed
-    xaxis_tickangle=-45  # Rotate x-axis labels if needed for better readability
+    height=600  # Adjust height as needed
 )
 
 # Show the plot
